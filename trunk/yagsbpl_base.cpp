@@ -2,9 +2,9 @@
 *                                                                                        *
 *    Yet Another Graph-Search Based Planning Library (YAGSBPL)                           *
 *    A template-based C++ library for graph search and planning                          *
-*    Version 1.5                                                                         *
+*    Version 2.0                                                                         *
 *    ----------------------------------------------------------                          *
-*    Copyright (C) 2010  Subhrajit Bhattacharya                                          *
+*    Copyright (C) 2011  Subhrajit Bhattacharya                                          *
 *                                                                                        *
 *    This program is free software: you can redistribute it and/or modify                *
 *    it under the terms of the GNU General Public License as published by                *
@@ -17,12 +17,12 @@
 *    GNU General Public License for more details <http://www.gnu.org/licenses/>.         *
 *                                                                                        *
 *                                                                                        *
-*    Contact: subhrajit@gmail.com, http://fling.seas.upenn.edu/~subhrabh/                *
+*    Contact: subhrajit@gmail.com, http://subhrajit.net/                                 *
 *                                                                                        *
 *                                                                                        *
 ******************************************************************************************/
 //    For a detailed tutorial and download, visit 
-//    http://fling.seas.upenn.edu/~subhrabh/cgi-bin/wiki/index.php?n=Projects.ProgrammingLibraries-YAGSBPL
+//    http://subhrajit.net/index.php?WPage=yagsbpl
 
 
 template <class NodeType, class CostType, class PlannerSpecificVariables>
