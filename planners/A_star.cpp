@@ -2,9 +2,9 @@
 *                                                                                        *
 *    Yet Another Graph-Search Based Planning Library (YAGSBPL)                           *
 *    A template-based C++ library for graph search and planning                          *
-*    Version 1.0                                                                         *
+*    Version 2.0                                                                         *
 *    ----------------------------------------------------------                          *
-*    Copyright (C) 2010  Subhrajit Bhattacharya                                          *
+*    Copyright (C) 2011  Subhrajit Bhattacharya                                          *
 *                                                                                        *
 *    This program is free software: you can redistribute it and/or modify                *
 *    it under the terms of the GNU General Public License as published by                *
@@ -17,21 +17,21 @@
 *    GNU General Public License for more details <http://www.gnu.org/licenses/>.         *
 *                                                                                        *
 *                                                                                        *
-*    Contact: subhrajit@gmail.com, http://fling.seas.upenn.edu/~subhrabh/                *
+*    Contact: subhrajit@gmail.com, http://subhrajit.net/                                 *
 *                                                                                        *
 *                                                                                        *
 ******************************************************************************************/
 //    For a detailed tutorial and download, visit 
-//    http://fling.seas.upenn.edu/~subhrabh/cgi-bin/wiki/index.php?n=Projects.ProgrammingLibraries-YAGSBPL
+//    http://subhrajit.net/index.php?WPage=yagsbpl
 
 
 template <class NodeType, class CostType>
-void A_star_planner<NodeType,CostType>::init( GenericSearchGraphDescriptor<NodeType,CostType> theEnv , bool resetHash )
+void A_star_planner<NodeType,CostType>::init( GenericSearchGraphDescriptor<NodeType,CostType>* theEnv_p)
 {
 	GraphNode_p thisGraphNode;
 	
-	if (resetHash)
-		GenericPlannerInstance.init(theEnv, heapKeyCount);  // This initiates the graph, hash and heap of the generic planner
+	if (theEnv_p)
+		GenericPlannerInstance.init(*theEnv_p, heapKeyCount);  // This initiates the graph, hash and heap of the generic planner
 	
 	// Remapping for coding convenience
 	GraphDescriptor = GenericPlannerInstance.GraphDescriptor;
@@ -59,7 +59,7 @@ void A_star_planner<NodeType,CostType>::init( GenericSearchGraphDescriptor<NodeT
 			
 			if ( !GraphDescriptor->_isAccessible( thisGraphNode->n ) )
 			{
-				printf("ERROR (A_star): One of the seed nodes is not accessible!" );
+				printf("ERROR (A_star): At least one of the seed nodes is not accessible!" );
 				exit(1);
 			}
 			else
@@ -89,9 +89,9 @@ void A_star_planner<NodeType,CostType>::clearLastPlanAndInit( GenericSearchGraph
 	
 	// Clear the last plan, but not the hash table
 	if (theEnv_p)
-		init(*theEnv_p, false);
+		init(theEnv_p);
 	else
-		init(*GraphDescriptor, false);
+		init(GraphDescriptor);
 }
 
 // ==================================================================================
@@ -105,7 +105,7 @@ void A_star_planner<NodeType,CostType>::plan(void)
 	std::vector< CostType > thisTransitionCosts;
 	int a;
 	
-	#if VIEW_PROGRESS_A_STAR
+	#if _YAGSBPL_A_STAR__VIEW_PROGRESS
 		float timediff = 0.0;
 		expandcount = 0;
 		startclock = clock();
@@ -113,13 +113,13 @@ void A_star_planner<NodeType,CostType>::plan(void)
 	#endif
 	while ( !heap->empty() )
 	{
-		#if VIEW_PROGRESS_A_STAR
+		#if _YAGSBPL_A_STAR__VIEW_PROGRESS
 			if (expandcount % ProgressShowInterval == 0)
 			{
 				if (timediff>=0.0)
 					timediff = ((float)(clock()-startclock)) / ((float)CLOCKS_PER_SEC);
 				printf("Number of states expanded: %d. Heap size: %d. Time elapsed: %f s.\n", 
-											expandcount, heap->size(), ((timediff>=0.0) ? timediff : difftime(time(NULL),startsecond)) );
+						expandcount, heap->size(), ((timediff>=0.0) ? timediff : difftime(time(NULL),startsecond)) );
 			}
 			expandcount++;
 		#endif
@@ -128,15 +128,24 @@ void A_star_planner<NodeType,CostType>::plan(void)
 		thisGraphNode = heap->pop();
 		thisGraphNode->plannerVars.expanded = true; // Put in closed list
 		
+		#if _YAGSBPL_A_STAR__HANDLE_EVENTS
+			if (event_NodeExpanded_g)
+				event_NodeExpanded_g(thisGraphNode->n, thisGraphNode->plannerVars.g, 
+										thisGraphNode->f, thisGraphNode->plannerVars.seedLineage);
+			else if (event_NodeExpanded_nm)
+				(thisGraphNode->n.*event_NodeExpanded_nm)(thisGraphNode->plannerVars.g, 
+										thisGraphNode->f, thisGraphNode->plannerVars.seedLineage);
+		#endif
+		
 		// Check if we need to stop furthur expansion
 		if ( GraphDescriptor->_stopSearch( thisGraphNode->n ) )
 		{
 			bookmarkGraphNodes.push_back(thisGraphNode);
-			#if VIEW_PROGRESS_A_STAR
+			#if _YAGSBPL_A_STAR__VIEW_PROGRESS
 				if (timediff>=0.0)
 					timediff = ((float)(clock()-startclock)) / ((float)CLOCKS_PER_SEC);
 				printf("Stopping search!! Number of states expanded: %d. Heap size: %d. Time elapsed: %f s.\n", 
-											expandcount, heap->size(), ((timediff>=0.0) ? timediff : difftime(time(NULL),startsecond)) );
+						expandcount, heap->size(), ((timediff>=0.0) ? timediff : difftime(time(NULL),startsecond)) );
 			#endif
 			return;
 		}
@@ -144,11 +153,11 @@ void A_star_planner<NodeType,CostType>::plan(void)
 		if ( GraphDescriptor->_storePath( thisGraphNode->n ) )
 		{
 			bookmarkGraphNodes.push_back(thisGraphNode);
-			#if VIEW_PROGRESS_A_STAR
+			#if _YAGSBPL_A_STAR__VIEW_PROGRESS
 				if (timediff>=0.0)
 					timediff = ((float)(clock()-startclock)) / ((float)CLOCKS_PER_SEC);
 				printf("Stored a path!! Number of states expanded: %d. Heap size: %d. Time elapsed: %f s.\n", 
-											expandcount, heap->size(), ((timediff>=0.0) ? timediff : difftime(time(NULL),startsecond)) );
+						expandcount, heap->size(), ((timediff>=0.0) ? timediff : difftime(time(NULL),startsecond)) );
 			#endif
 		}
 		
@@ -167,8 +176,8 @@ void A_star_planner<NodeType,CostType>::plan(void)
 		this_g_val = thisGraphNode->plannerVars.g;
 		for (a=0; a<thisGraphNode->successors.size(); a++)
 		{
-			thisNeighbourGraphNode = thisGraphNode->successors.getLinkSearchGraphNode(a); //thisGraphNode->successors->operator[](a);
-			thisTransitionCost = thisGraphNode->successors.getLinkCost(a); //thisGraphNode->successorsTransitionCosts[a];
+			thisNeighbourGraphNode = thisGraphNode->successors.getLinkSearchGraphNode(a);
+			thisTransitionCost = thisGraphNode->successors.getLinkCost(a);
 			
 			// An uninitiated neighbour node - definitely g & f values not set either.
 			if ( !thisNeighbourGraphNode->initiated )
@@ -187,6 +196,16 @@ void A_star_planner<NodeType,CostType>::plan(void)
 					heap->push( thisNeighbourGraphNode );
 				}
 				thisNeighbourGraphNode->initiated = true; // Always set this when other variables have already been set
+				#if _YAGSBPL_A_STAR__HANDLE_EVENTS
+					if (event_SuccUpdated_g)
+						event_SuccUpdated_g(thisGraphNode->n, thisNeighbourGraphNode->n, thisTransitionCost, 
+												thisNeighbourGraphNode->plannerVars.g, thisNeighbourGraphNode->f, 
+													thisNeighbourGraphNode->plannerVars.seedLineage);
+					else if (event_SuccUpdated_nm)
+						(thisGraphNode->n.*event_SuccUpdated_nm)(thisNeighbourGraphNode->n, thisTransitionCost, 
+												thisNeighbourGraphNode->plannerVars.g, thisNeighbourGraphNode->f, 
+													thisNeighbourGraphNode->plannerVars.seedLineage);
+				#endif
 				continue;
 			}
 			
@@ -207,6 +226,16 @@ void A_star_planner<NodeType,CostType>::plan(void)
 				// Since thisNeighbourGraphNode->f is changed, re-arrange it in heap
 				heap->remove( thisNeighbourGraphNode );
 				heap->push( thisNeighbourGraphNode );
+				#if _YAGSBPL_A_STAR__HANDLE_EVENTS
+					if (event_SuccUpdated_g)
+						event_SuccUpdated_g(thisGraphNode->n, thisNeighbourGraphNode->n, thisTransitionCost, 
+												thisNeighbourGraphNode->plannerVars.g, thisNeighbourGraphNode->f, 
+													thisNeighbourGraphNode->plannerVars.seedLineage);
+					else if (event_SuccUpdated_nm)
+						(thisGraphNode->n.*event_SuccUpdated_nm)(thisNeighbourGraphNode->n, thisTransitionCost, 
+												thisNeighbourGraphNode->plannerVars.g, thisNeighbourGraphNode->f, 
+													thisNeighbourGraphNode->plannerVars.seedLineage);
+				#endif
 			}
 		}
 	}

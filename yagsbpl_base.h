@@ -2,9 +2,9 @@
 *                                                                                        *
 *    Yet Another Graph-Search Based Planning Library (YAGSBPL)                           *
 *    A template-based C++ library for graph search and planning                          *
-*    Version 1.5                                                                         *
+*    Version 2.0                                                                         *
 *    ----------------------------------------------------------                          *
-*    Copyright (C) 2010  Subhrajit Bhattacharya                                          *
+*    Copyright (C) 2011  Subhrajit Bhattacharya                                          *
 *                                                                                        *
 *    This program is free software: you can redistribute it and/or modify                *
 *    it under the terms of the GNU General Public License as published by                *
@@ -17,12 +17,12 @@
 *    GNU General Public License for more details <http://www.gnu.org/licenses/>.         *
 *                                                                                        *
 *                                                                                        *
-*    Contact: subhrajit@gmail.com, http://fling.seas.upenn.edu/~subhrabh/                *
+*    Contact: subhrajit@gmail.com, http://subhrajit.net/                                 *
 *                                                                                        *
 *                                                                                        *
 ******************************************************************************************/
 //    For a detailed tutorial and download, visit 
-//    http://fling.seas.upenn.edu/~subhrabh/cgi-bin/wiki/index.php?n=Projects.ProgrammingLibraries-YAGSBPL
+//    http://subhrajit.net/index.php?WPage=yagsbpl
 
 
 #ifndef __YAGSBPL_BASE_2F585H2B321R_H_
@@ -34,12 +34,14 @@
 
 #define _yagsbpl_abs(x) ((x)>0?(x):(-x))
 
+
 // Declaration
 template <class NodeType, class CostType, class PlannerSpecificVariables>
 class SearchGraphNode;
 
 // ---
 
+// This class stores information about edges emanating from or incident to a node
 template <class NodeType, class CostType, class PlannerSpecificVariables>
 class NodeLinks
 {
@@ -78,7 +80,7 @@ public:
 	// TODO for planner: Planner must set each of the following every time a "non-initiated" node is encountered.
 	bool initiated; // Used for tracking newly-create nodes by hash table. To be set to "true" by planner.
 	NodeLinks<NodeType,CostType,PlannerSpecificVariables> successors;
-	NodeLinks<NodeType,CostType,PlannerSpecificVariables> predecessors;
+	NodeLinks<NodeType,CostType,PlannerSpecificVariables> predecessors; // Planner may or may not use this
 	SearchGraphNode<NodeType,CostType,PlannerSpecificVariables>* came_from;
 	PlannerSpecificVariables plannerVars; // Other variables, if required by planner
 	CostType f; // f-value: Used for maintaining the heap
@@ -90,7 +92,6 @@ public:
 	SearchGraphNode<NodeType,CostType,PlannerSpecificVariables>* nxt;
 	
 	SearchGraphNode() { initiated=false; came_from=NULL; 
-							//successors=NULL; predecessors=NULL;
 								inHeap=false; prev=NULL; nxt=NULL; }
 };
 
@@ -127,9 +128,7 @@ public:
 };
 
 // =============================================================================
-// TODO for environment: This is the only class an instance of which an "environment" needs to set/describe.
-//   That needs to be passed into the "init" function of the "GenericPlanner"
-
+// Helper classes for 'GenericSearchGraphDescriptor'
 
 template <class NodeType, class CostType>
 class SearchGraphDescriptorFunctionContainer
@@ -174,6 +173,10 @@ public:
 	bool stopSearch(NodeType& n) 
 		{ if(p && stopSearch_fp) return ( (p->*stopSearch_fp)(n) ); else this->func_redefined = false; }
 };
+
+// ----
+// TODO for environment: 'GenericSearchGraphDescriptor' is the only class an instance of which needs to be created.
+//   That needs to be passed into the "init" function of the "GenericPlanner"
 
 template <class NodeType, class CostType>
 class GenericSearchGraphDescriptor

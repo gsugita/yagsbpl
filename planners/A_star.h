@@ -2,9 +2,9 @@
 *                                                                                        *
 *    Yet Another Graph-Search Based Planning Library (YAGSBPL)                           *
 *    A template-based C++ library for graph search and planning                          *
-*    Version 1.0                                                                         *
+*    Version 2.0                                                                         *
 *    ----------------------------------------------------------                          *
-*    Copyright (C) 2010  Subhrajit Bhattacharya                                          *
+*    Copyright (C) 2011  Subhrajit Bhattacharya                                          *
 *                                                                                        *
 *    This program is free software: you can redistribute it and/or modify                *
 *    it under the terms of the GNU General Public License as published by                *
@@ -17,12 +17,12 @@
 *    GNU General Public License for more details <http://www.gnu.org/licenses/>.         *
 *                                                                                        *
 *                                                                                        *
-*    Contact: subhrajit@gmail.com, http://fling.seas.upenn.edu/~subhrabh/                *
+*    Contact: subhrajit@gmail.com, http://subhrajit.net/                                 *
 *                                                                                        *
 *                                                                                        *
 ******************************************************************************************/
 //    For a detailed tutorial and download, visit 
-//    http://fling.seas.upenn.edu/~subhrabh/cgi-bin/wiki/index.php?n=Projects.ProgrammingLibraries-YAGSBPL
+//    http://subhrajit.net/index.php?WPage=yagsbpl
 
 
 #ifndef __A_STAR_2F585H2B321R_H_
@@ -36,8 +36,8 @@
 #include <ctime>
 #include "yagsbpl_base.h"
 
-#define VIEW_PROGRESS_A_STAR 1
-
+#define _YAGSBPL_A_STAR__VIEW_PROGRESS 1
+#define _YAGSBPL_A_STAR__HANDLE_EVENTS 1
 
 template <class CostType>
 class A_star_variables
@@ -70,14 +70,27 @@ public:
 	int ProgressShowInterval;
 	std::vector< GraphNode_p > bookmarkGraphNodes;
 	
+	// Optional event handlers - Pointers to function that get called when an event take place
+	#if _YAGSBPL_A_STAR__HANDLE_EVENTS
+		// Node 'n' is expanded. This can also be handeled by 'stopSearch'.
+		void (*event_NodeExpanded_g)(NodeType n, CostType gVal, CostType fVal, int seedLineage);
+		void (NodeType::*event_NodeExpanded_nm)(CostType gVal, CostType fVal, int seedLineage);
+		// Successor 'nn' is in open list and is just initiated or is updated
+		void (*event_SuccUpdated_g)(NodeType n, NodeType nn, CostType edgeCost, CostType gVal, CostType fVal, int seedLineage);
+		void (NodeType::*event_SuccUpdated_nm)(NodeType nn, CostType edgeCost, CostType gVal, CostType fVal, int seedLineage);
+	#endif
+	
 	// Initializer and planner
 	A_star_planner()
-		{ subopEps = 1.0; heapKeyCount = 20; ProgressShowInterval = 10000; }
+		{ subopEps = 1.0; heapKeyCount = 20; ProgressShowInterval = 10000; 
+		  event_NodeExpanded_g=NULL; event_NodeExpanded_nm=NULL; event_SuccUpdated_g=NULL; event_SuccUpdated_nm=NULL; }
 	void setParams( double eps=1.0 , int heapKeyCt=20 , int progressDispInterval=10000 ) // call to this is optional.
 		{ subopEps = eps; heapKeyCount = heapKeyCt; ProgressShowInterval = progressDispInterval; }
-	void init( GenericSearchGraphDescriptor<NodeType,CostType> theEnv , bool resetHash=true );
+	void init( GenericSearchGraphDescriptor<NodeType,CostType>* theEnv_p=NULL );
+	void init( GenericSearchGraphDescriptor<NodeType,CostType> theEnv ) { init( &theEnv); } // for version compatability
 	void plan(void);
 	// Clear the last plan, but not the hash table.
+	
 	void clearLastPlanAndInit( GenericSearchGraphDescriptor<NodeType,CostType>* theEnv_p=NULL );
 	
 	// Planner output access: ( to be called after plan(), and before destruction of planner )
@@ -88,7 +101,7 @@ public:
 	A_star_variables<CostType> getNodeInfo(NodeType n);
 	
 	// Other variables for querying progress of planning process from other functions
-	#if VIEW_PROGRESS_A_STAR
+	#if  _YAGSBPL_A_STAR__VIEW_PROGRESS
 		clock_t  startclock;
 		time_t startsecond;
 		int expandcount;
