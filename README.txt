@@ -2,9 +2,9 @@
 *                                                                                        *
 *    Yet Another Graph-Search Based Planning Library (YAGSBPL)                           *
 *    A template-based C++ library for graph search and planning                          *
-*    Version 2.0                                                                         *
+*    Version 2.1                                                                         *
 *    ----------------------------------------------------------                          *
-*    Copyright (C) 2011  Subhrajit Bhattacharya                                          *
+*    Copyright (C) 2013  Subhrajit Bhattacharya                                          *
 *                                                                                        *
 *    This program is free software: you can redistribute it and/or modify                *
 *    it under the terms of the GNU General Public License as published by                *
@@ -42,4 +42,8 @@ Version history:
     - Event handling introduced for A* planner
     - Some structural modifications in 'SearchGraphNode' class
     - Ability to keep track of lineage when multiple seed nodes are present
+
+* May 2013: v2.1 released
+    - Some bug fixes
+    - Binary heap as priority list
     

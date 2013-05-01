@@ -2,9 +2,9 @@
 *                                                                                        *
 *    Yet Another Graph-Search Based Planning Library (YAGSBPL)                           *
 *    A template-based C++ library for graph search and planning                          *
-*    Version 2.0                                                                         *
+*    Version 2.1                                                                         *
 *    ----------------------------------------------------------                          *
-*    Copyright (C) 2011  Subhrajit Bhattacharya                                          *
+*    Copyright (C) 2013  Subhrajit Bhattacharya                                          *
 *                                                                                        *
 *    This program is free software: you can redistribute it and/or modify                *
 *    it under the terms of the GNU General Public License as published by                *
@@ -25,252 +25,96 @@
 //    http://subhrajit.net/index.php?WPage=yagsbpl
 
 
+#define f_val(ptr) ( (ptr)->f ) 
+
+template <class NodeType, class CostType, class PlannerSpecificVariables>
+void HeapContainer<NodeType,CostType,PlannerSpecificVariables>::update (heapItem_p np, BubbleDirection bubdir)
+{
+    // Does both bubble up and down
+    if (!(np->inHeap)) return;
+    int currentPos = np->heapArrayPos;
+    
+    // Bubble up
+    if (bubdir != DOWNONLY_BUBDIR) {
+        int parentPos = (currentPos - 1) / 2; // position of parent
+        if ( f_val(heapArray[parentPos]) > f_val(np) ) {
+            heapArray[currentPos] = heapArray[parentPos];
+            heapArray[parentPos] = np;
+            heapArray[currentPos]->heapArrayPos = currentPos;
+            heapArray[parentPos]->heapArrayPos = parentPos;
+            update(heapArray[parentPos], UPONLY_BUBDIR); // recursive call. If heap, downward bubbling won't be needed.
+            return; // no need to check children, since chilren will have higher values
+        }
+        if (bubdir == UPONLY_BUBDIR) return;
+    }
+    
+    // Bubble down
+    int leftChildPos = 2*currentPos + 1;
+    int rightChildPos = 2*currentPos + 2;
+    int exchangeChildPos;
+    if (leftChildPos<heapArray.size() && rightChildPos<heapArray.size())
+        exchangeChildPos = ( f_val(heapArray[leftChildPos]) > f_val(heapArray[rightChildPos]) ) ? rightChildPos : leftChildPos;
+    else if (leftChildPos<heapArray.size())
+        exchangeChildPos = leftChildPos;
+    else if (rightChildPos<heapArray.size())
+        exchangeChildPos = rightChildPos;
+    else
+        return;
+        
+    if ( f_val(np) > f_val(heapArray[exchangeChildPos]) ) {
+        heapArray[currentPos] = heapArray[exchangeChildPos];
+        heapArray[exchangeChildPos] = np;
+        heapArray[currentPos]->heapArrayPos = currentPos;
+        heapArray[exchangeChildPos]->heapArrayPos = exchangeChildPos;
+        update(heapArray[exchangeChildPos], DOWNONLY_BUBDIR); // recursive call. If heap, upward bubbling won't be needed.
+        return;
+    }
+}
+
+// SB_BINHEAP -------------------------------------------------------
+
+
 template <class NodeType, class CostType, class PlannerSpecificVariables>
 void HeapContainer<NodeType,CostType,PlannerSpecificVariables>::push 
-									( SearchGraphNode<NodeType,CostType,PlannerSpecificVariables>* np, 
-										SearchGraphNode<NodeType,CostType,PlannerSpecificVariables>* searchStart )
+									( SearchGraphNode<NodeType,CostType,PlannerSpecificVariables>* np )
 {
-	if (!start && !end) // empty list
-	{
-		key_init(np);
-		start = np;
-		end = np;
-		heap_size = 1;
-	}
-	else
-	{
-		heapItem_p pointer;
-		if (searchStart)
-			pointer = searchStart;
-		else
-			pointer = key_find(np->f);
-		
-		while (true)
-		{
-			// found position at the beginning
-			if ( pointer->f <= np->f && !pointer->prev )
-			{
-				start->prev = np;
-				np->nxt = start;
-				start = np;
-				break;
-			}
-			// found position at the middle
-			if ( pointer->f <= np->f && pointer->prev->f >= np->f )
-			{
-				np->prev = pointer->prev;
-				np->nxt = pointer;
-				pointer->prev->nxt = np;
-				pointer->prev = np;
-				break;
-			}
-			// found position at the end
-			if ( pointer->f >= np->f && !pointer->nxt )
-			{
-				end->nxt = np;
-				np->prev = end;
-				end = np;
-				break;
-			}
-			
-			if ( pointer->f <= np->f )
-				pointer = pointer->prev;
-			else if ( pointer->f > np->f )
-				pointer = pointer->nxt;
-		}
-		
-		np->inHeap = true;
-		heap_size++;
-		key_update(np);
-	}
+	// Assumes np is not in heap. No check is done for that.
+    // Add as leaf
+    heapArray.push_back(np);
+    heap_size++; // SB_BINHEAP2
+    np->inHeap = true;
+    np->heapArrayPos = heapArray.size() - 1;
+    // Bubble up
+    update(np, UPONLY_BUBDIR);
 }
 
 
 template <class NodeType, class CostType, class PlannerSpecificVariables>
 SearchGraphNode<NodeType,CostType,PlannerSpecificVariables>* HeapContainer<NodeType,CostType,PlannerSpecificVariables>::pop(void)
 {
-	heapItem_p ret;
-	ret = end;
-	key_remove(ret);
-	
-	if (heap_size > 1)
-	{
-		end = end->prev;
-		end->nxt = NULL;
-		ret->prev = NULL;
-		ret->inHeap = false;
-		heap_size--;
-	}
-	else if (heap_size==1)
-	{
-		start = NULL;
-		end = NULL;
-		ret->inHeap = false;
-		heap_size--;
-	}
-	
-	return ret;
+	heapItem_p ret = heapArray[0];
+    ret->inHeap = false;
+    ret->heapArrayPos = -1;
+    // Take last leaf and place it at root
+    heapArray[0] = heapArray[heapArray.size()-1];
+    heapArray[0]->heapArrayPos = 0;
+    heapArray.pop_back();
+    heap_size--;
+    // Bubble down
+    update(heapArray[0], DOWNONLY_BUBDIR);
+    
+    return (ret);
 }
 
 
 template <class NodeType, class CostType, class PlannerSpecificVariables>
 void HeapContainer<NodeType,CostType,PlannerSpecificVariables>::remove (SearchGraphNode<NodeType,CostType,PlannerSpecificVariables>* np)
 {
-	key_remove(np);
-	
-	if (np->prev) // Not at the beginning
-		np->prev->nxt = np->nxt;
-	else
-		start = np->nxt;
-		
-	if (np->nxt)
-		np->nxt->prev = np->prev;
-	else
-		end = np->prev;
-		
-	np->nxt = NULL;
-	np->prev = NULL;
-	np->inHeap = false;
-	heap_size--;
-}
-
-// -------------
-
-
-template <class NodeType, class CostType, class PlannerSpecificVariables>
-void HeapContainer<NodeType,CostType,PlannerSpecificVariables>::key_init(heapItem_p item)
-{
-	for (int a=0; a<keyCount; a++)
-	{
-		keyPoints[a] = item;
-		keyVals[a] = item->f;
-	}
-}
-
-
-template <class NodeType, class CostType, class PlannerSpecificVariables>
-void HeapContainer<NodeType,CostType,PlannerSpecificVariables>::key_update(heapItem_p item)
-		// To be called after instering item into heap
-{
-	if ( heap_size<=1 || start->f==end->f )
-	{
-		key_init(item);
-		return;
-	}
-	CostType range = start->f - end->f;
-	int itemPos = (int)( (( item->f - end->f ) * keyCount) / range ); // Can assume values from 0 to keyCount
-	int itemPosP1 = itemPos + 1;
-	CostType PosIdealVal = end->f + (itemPosP1*range)/keyCountP1;
-	
-	
-	if ( itemPos<keyCount   &&  _yagsbpl_abs( item->f - PosIdealVal ) < _yagsbpl_abs( keyVals[itemPos] - PosIdealVal ) )
-	{
-		keyPoints[itemPos] = item;
-		keyVals[itemPos] = PosIdealVal;
-	}
-	else if ( itemPos>0 )
-	{
-		itemPos--;
-		itemPosP1--;
-		PosIdealVal = end->f + (itemPosP1*range)/keyCountP1;
-		if ( _yagsbpl_abs( item->f - PosIdealVal ) < _yagsbpl_abs( keyVals[itemPos] - PosIdealVal ) )
-		{
-			keyPoints[itemPos] = item;
-			keyVals[itemPos] = PosIdealVal;
-		}
-	}
-}
-
-
-template <class NodeType, class CostType, class PlannerSpecificVariables>
-void HeapContainer<NodeType,CostType,PlannerSpecificVariables>::key_remove(heapItem_p item)
-			// should be called before the nxt and prev are set to NULL.
-{
-	int itemTentativePos;
-	if (start->f == end->f)
-		itemTentativePos = 0;
-	else
-		itemTentativePos = (int)( (( item->f - end->f ) * keyCount) / (start->f - end->f) ); // value: 0 to keyCount
-	int l=itemTentativePos-1, r=itemTentativePos;
-	
-	while (r < keyCount)
-	{
-		if (keyPoints[r] == item)
-		{
-			if (item->nxt)
-			{
-				keyPoints[r] = item->nxt;
-				keyVals[r] = item->nxt->f;
-				return;
-			}
-			if (item->prev)
-			{
-				keyPoints[r] = item->prev;
-				keyVals[r] = item->prev->f;
-				return;
-			}
-		}
-		r++;
-	}
-	while (l >= 0)
-	{
-		if (keyPoints[l] == item)
-		{
-			if (item->prev)
-			{
-				keyPoints[l] = item->prev;
-				keyVals[l] = item->prev->f;
-				return;
-			}
-			if (item->nxt)
-			{
-				keyPoints[l] = item->nxt;
-				keyVals[l] = item->nxt->f;
-				return;
-			}
-		}
-		l--;
-	}
-	
-}
-
-
-template <class NodeType, class CostType, class PlannerSpecificVariables>
-SearchGraphNode<NodeType,CostType,PlannerSpecificVariables>* 
-						HeapContainer<NodeType,CostType,PlannerSpecificVariables>::key_find (CostType f)
-{
-	CostType fRes = (start->f - end->f) / keyCountP1;
-	int pos = keyCount / 2; // level=2 to start with.
-	int level = 4;
-	while ( level <= keyCount  &&  pos >= 0  &&  pos < keyCount)
-	{
-		if ( keyVals[pos] < f )
-		{
-			if ( f - keyVals[pos] <= fRes )
-				break;
-			pos += keyCount / level;
-		}
-		else
-		{
-			if ( keyVals[pos] - f <= fRes )
-				break;
-			pos -= keyCount / level;
-		}
-		level *= 2;
-	}
-	
-	if (pos < 0)
-		return (end);
-	if (pos >= keyCount)
-		return (start);
-	if ( !keyPoints[pos]->inHeap )
-	{
-		if ( f - end->f  <=  start->f - f )
-			return(end);
-		else
-			return(start);
-	}
-	return (keyPoints[pos]);
+	CostType tmp_h = np->h;
+	np->h = -std::numeric_limits<CostType>::infinity();
+	update(np);
+	pop();
+	np->h = tmp_h;
 }
 
 // =================================================================================
@@ -294,8 +138,9 @@ GenericSearchGraphDescriptor<NodeType,CostType>::GenericSearchGraphDescriptor()
 template <class NodeType, class CostType>
 void GenericSearchGraphDescriptor<NodeType,CostType>::init(void)
 {
-	if (SeedNodes.size() == 0)
+	if (SeedNodes.size() == 0) {
 		SeedNodes.push_back(SeedNode);
+	}
 	// Other initializations - to be included in future versions
 }
 
@@ -454,6 +299,8 @@ template <class NodeType, class CostType, class PlannerSpecificVariables>
 void GenericPlanner<NodeType,CostType,PlannerSpecificVariables>::init
 						( GenericSearchGraphDescriptor<NodeType,CostType> theEnv , int heapKeyNum )
 {
+    _yagsbpl_display_version;
+    
 	GraphDescriptor = new GenericSearchGraphDescriptor<NodeType,CostType>;
 	*GraphDescriptor = theEnv;
 	

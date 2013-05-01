@@ -2,9 +2,9 @@
 *                                                                                        *
 *    Yet Another Graph-Search Based Planning Library (YAGSBPL)                           *
 *    A template-based C++ library for graph search and planning                          *
-*    Version 2.0                                                                         *
+*    Version 2.1                                                                         *
 *    ----------------------------------------------------------                          *
-*    Copyright (C) 2011  Subhrajit Bhattacharya                                          *
+*    Copyright (C) 2013  Subhrajit Bhattacharya                                          *
 *                                                                                        *
 *    This program is free software: you can redistribute it and/or modify                *
 *    it under the terms of the GNU General Public License as published by                *
@@ -31,8 +31,11 @@
 #include <stdio.h>
 #include <vector>
 #include <cstdlib>
+#include <limits>
 
 #define _yagsbpl_abs(x) ((x)>0?(x):(-x))
+#define _yagsbpl_display_version { if (!YAGSBPL_vDisplay_done) { printf("\n*** You are using YAGSBPL v 2.1. ***\n"); YAGSBPL_vDisplay_done = true; } }
+bool YAGSBPL_vDisplay_done = false;
 
 
 // Declaration
@@ -88,11 +91,9 @@ public:
 	// ---------------------------------------------------------------
 	// These variables are used by heap container
 	bool inHeap;
-	SearchGraphNode<NodeType,CostType,PlannerSpecificVariables>* prev;
-	SearchGraphNode<NodeType,CostType,PlannerSpecificVariables>* nxt;
+	int heapArrayPos;
 	
-	SearchGraphNode() { initiated=false; came_from=NULL; 
-								inHeap=false; prev=NULL; nxt=NULL; }
+	SearchGraphNode() { initiated=false; came_from=NULL; inHeap=false; }
 };
 
 // ---------------------------------------------------------------------
@@ -105,22 +106,15 @@ public:
 	typedef  SearchGraphNode<NodeType,CostType,PlannerSpecificVariables>*  heapItem_p;
 	
 	int heap_size;
-	heapItem_p start;
-	heapItem_p end;
+	std::vector <heapItem_p> heapArray;
 	
-	heapItem_p* keyPoints;
-	CostType* keyVals;
-	int keyCount, keyCountP1;
-	void key_init(heapItem_p item);
-	void key_update(heapItem_p item);
-	void key_remove(heapItem_p item);
-	heapItem_p key_find(CostType f);
+	HeapContainer(int kc=20) { heap_size=0; }
 	
-	HeapContainer(int kc=20) { heap_size=0; start=NULL; end=NULL; 
-								keyCount = kc; keyCountP1 = kc+1; keyPoints = new heapItem_p[kc]; keyVals = new CostType[kc]; }
-	~HeapContainer() { delete[] keyPoints; delete[] keyVals; }
-	void push(heapItem_p np, heapItem_p searchStart=NULL);
+	typedef enum {UNKNOWN_BUBDIR, UPONLY_BUBDIR, DOWNONLY_BUBDIR} BubbleDirection;
+	
+	void push(heapItem_p np);
 	heapItem_p pop(void);
+	void update (heapItem_p np, BubbleDirection bubdir=UNKNOWN_BUBDIR);
 	void remove(heapItem_p np);
 	void clear(void) { while (heap_size>0) pop(); };
 	bool empty(void) { return (heap_size==0); };
@@ -138,11 +132,12 @@ public:
 	virtual int getHashBin(NodeType& n) { func_redefined = false; };
 	virtual bool isAccessible(NodeType& n) { func_redefined = false; };
 	virtual void getSuccessors(NodeType& n, std::vector<NodeType>* s, std::vector<CostType>* c) { func_redefined = false; };
-	virtual void getPredecessors(NodeType& n, std::vector<NodeType>* s, std::vector<CostType>* c)
-													{ func_redefined = false; };
-	virtual CostType getHeuristics(NodeType& n1, NodeType& n2) { func_redefined = false; };
+	virtual void getPredecessors(NodeType& n, std::vector<NodeType>* s, std::vector<CostType>* c) { func_redefined = false; };
 	virtual bool storePath(NodeType& n) { func_redefined = false; };
 	virtual bool stopSearch(NodeType& n) { func_redefined = false; };
+	
+	// 
+	virtual CostType getHeuristics(NodeType& n1, NodeType& n2) { func_redefined = false; };
 };
 
 template <class NodeType, class CostType, class ContainerClass>

@@ -2,9 +2,9 @@
 *                                                                                        *
 *    Yet Another Graph-Search Based Planning Library (YAGSBPL)                           *
 *    A template-based C++ library for graph search and planning                          *
-*    Version 2.0                                                                         *
+*    Version 2.1                                                                         *
 *    ----------------------------------------------------------                          *
-*    Copyright (C) 2011  Subhrajit Bhattacharya                                          *
+*    Copyright (C) 2013  Subhrajit Bhattacharya                                          *
 *                                                                                        *
 *    This program is free software: you can redistribute it and/or modify                *
 *    it under the terms of the GNU General Public License as published by                *
@@ -26,12 +26,14 @@
 
 
 template <class NodeType, class CostType>
-void A_star_planner<NodeType,CostType>::init( GenericSearchGraphDescriptor<NodeType,CostType>* theEnv_p)
+void A_star_planner<NodeType,CostType>::init( GenericSearchGraphDescriptor<NodeType,CostType>* theEnv_p, bool createHashAndHeap )
 {
 	GraphNode_p thisGraphNode;
 	
-	if (theEnv_p)
+	if (theEnv_p && createHashAndHeap)
 		GenericPlannerInstance.init(*theEnv_p, heapKeyCount);  // This initiates the graph, hash and heap of the generic planner
+	else if (theEnv_p)
+	    *GenericPlannerInstance.GraphDescriptor = *theEnv_p;
 	
 	// Remapping for coding convenience
 	GraphDescriptor = GenericPlannerInstance.GraphDescriptor;
@@ -51,10 +53,10 @@ void A_star_planner<NodeType,CostType>::init( GenericSearchGraphDescriptor<NodeT
 		// If node was created, initialize it
 		if ( !thisGraphNode->initiated )
 		{
-			thisGraphNode->f = subopEps * GraphDescriptor->_getHeuristicsToTarget( thisGraphNode->n );
+			thisGraphNode->f = _heapFun(thisGraphNode->n, (CostType)0.0, GraphDescriptor->_getHeuristicsToTarget( thisGraphNode->n ), a);
 			thisGraphNode->came_from = NULL;
 			thisGraphNode->plannerVars.seedLineage = a;
-			thisGraphNode->plannerVars.g = 0;
+			thisGraphNode->plannerVars.g = (CostType)0.0;
 			thisGraphNode->plannerVars.expanded = false;
 			
 			if ( !GraphDescriptor->_isAccessible( thisGraphNode->n ) )
@@ -78,20 +80,38 @@ void A_star_planner<NodeType,CostType>::init( GenericSearchGraphDescriptor<NodeT
 template <class NodeType, class CostType>
 void A_star_planner<NodeType,CostType>::clearLastPlanAndInit( GenericSearchGraphDescriptor<NodeType,CostType>* theEnv_p )
 {
-	// Set every node in hash to not expanded
-	if (hash->HashTable)
+	        
+	// Set every node in hash to not expanded  
+	if (hash && hash->HashTable) {
 		for (int a=0; a<hash->hashTableSize; a++)
 			for (int b=0; b<hash->HashTable[a].size(); b++)
 			{
 				hash->HashTable[a][b]->plannerVars.expanded = false;
 				hash->HashTable[a][b]->initiated = false;
 			}
-	
-	// Clear the last plan, but not the hash table
-	if (theEnv_p)
-		init(theEnv_p);
-	else
-		init(GraphDescriptor);
+	    // Clear the last plan, but not the hash table
+	    if (theEnv_p)
+		    init(theEnv_p, false);
+	    else
+		    init(GraphDescriptor, false);
+    }
+    else {
+        if (theEnv_p)
+		    init(theEnv_p);
+	    else
+		    init(GraphDescriptor);
+	}
+}
+
+// ==================================================================================
+
+template <class NodeType, class CostType>
+CostType A_star_planner<NodeType,CostType>::_heapFun(NodeType& n, CostType g, CostType h, int s) 
+{
+    if (heapFun_fp)
+        return ( heapFun_fp(n, g, h, s) );
+        
+    return ( g + subopEps*h );
 }
 
 // ==================================================================================
@@ -114,19 +134,24 @@ void A_star_planner<NodeType,CostType>::plan(void)
 	while ( !heap->empty() )
 	{
 		#if _YAGSBPL_A_STAR__VIEW_PROGRESS
-			if (expandcount % ProgressShowInterval == 0)
-			{
-				if (timediff>=0.0)
-					timediff = ((float)(clock()-startclock)) / ((float)CLOCKS_PER_SEC);
-				printf("Number of states expanded: %d. Heap size: %d. Time elapsed: %f s.\n", 
-						expandcount, heap->size(), ((timediff>=0.0) ? timediff : difftime(time(NULL),startsecond)) );
+		    if(ProgressShowInterval>0) {
+			    if (expandcount % ProgressShowInterval == 0)
+			    {
+				    if (timediff>=0.0)
+					    timediff = ((float)(clock()-startclock)) / ((float)CLOCKS_PER_SEC);
+				    printf("Number of states expanded: %d. Heap size: %d. Time elapsed: %f s.\n", 
+						    expandcount, heap->size(), ((timediff>=0.0) ? timediff : difftime(time(NULL),startsecond)) );
+			    }
+			    expandcount++;
 			}
-			expandcount++;
 		#endif
 	
 		// Get the node with least f-value
 		thisGraphNode = heap->pop();
 		thisGraphNode->plannerVars.expanded = true; // Put in closed list
+		#if _YAGSBPL_A_STAR__PRINT_VERBOSE
+		    thisGraphNode->n.print("Now expanding: ");
+		#endif
 		
 		#if _YAGSBPL_A_STAR__HANDLE_EVENTS
 			if (event_NodeExpanded_g)
@@ -142,10 +167,12 @@ void A_star_planner<NodeType,CostType>::plan(void)
 		{
 			bookmarkGraphNodes.push_back(thisGraphNode);
 			#if _YAGSBPL_A_STAR__VIEW_PROGRESS
-				if (timediff>=0.0)
-					timediff = ((float)(clock()-startclock)) / ((float)CLOCKS_PER_SEC);
-				printf("Stopping search!! Number of states expanded: %d. Heap size: %d. Time elapsed: %f s.\n", 
-						expandcount, heap->size(), ((timediff>=0.0) ? timediff : difftime(time(NULL),startsecond)) );
+			    if (ProgressShowInterval>0) {
+				    if (timediff>=0.0)
+					    timediff = ((float)(clock()-startclock)) / ((float)CLOCKS_PER_SEC);
+				    printf("Stopping search!! Number of states expanded: %d. Heap size: %d. Time elapsed: %f s.\n", 
+						    expandcount, heap->size(), ((timediff>=0.0) ? timediff : difftime(time(NULL),startsecond)) );
+			    }
 			#endif
 			return;
 		}
@@ -171,6 +198,9 @@ void A_star_planner<NodeType,CostType>::plan(void)
 			for (a=0; a<thisNeighbours.size(); a++)
 				thisGraphNode->successors.set(a, hash->getNodeInHash(thisNeighbours[a]), thisTransitionCosts[a]);
 		}
+		#if _YAGSBPL_A_STAR__PRINT_VERBOSE
+		    printf("\tNumber of childeren: %d\n", thisGraphNode->successors.size());
+		#endif
 		
 		// Initiate the neighbours (if required) and update their g & f values
 		this_g_val = thisGraphNode->plannerVars.g;
@@ -178,6 +208,9 @@ void A_star_planner<NodeType,CostType>::plan(void)
 		{
 			thisNeighbourGraphNode = thisGraphNode->successors.getLinkSearchGraphNode(a);
 			thisTransitionCost = thisGraphNode->successors.getLinkCost(a);
+			#if _YAGSBPL_A_STAR__PRINT_VERBOSE
+		        thisNeighbourGraphNode->n.print("\tChild: ");
+		    #endif
 			
 			// An uninitiated neighbour node - definitely g & f values not set either.
 			if ( !thisNeighbourGraphNode->initiated )
@@ -188,8 +221,11 @@ void A_star_planner<NodeType,CostType>::plan(void)
 					thisNeighbourGraphNode->came_from = thisGraphNode;
 					thisNeighbourGraphNode->plannerVars.seedLineage = thisGraphNode->plannerVars.seedLineage;
 					thisNeighbourGraphNode->plannerVars.g = thisGraphNode->plannerVars.g + thisTransitionCost;
-					thisNeighbourGraphNode->f = thisNeighbourGraphNode->plannerVars.g + 
-													subopEps * GraphDescriptor->_getHeuristicsToTarget( thisNeighbourGraphNode->n );
+					thisNeighbourGraphNode->f = _heapFun(thisNeighbourGraphNode->n, thisNeighbourGraphNode->plannerVars.g, 
+					                                      GraphDescriptor->_getHeuristicsToTarget( thisNeighbourGraphNode->n ), 
+					                                      thisGraphNode->plannerVars.seedLineage);
+					                            //thisNeighbourGraphNode->plannerVars.g + 
+													//subopEps * GraphDescriptor->_getHeuristicsToTarget( thisNeighbourGraphNode->n );
 					thisNeighbourGraphNode->plannerVars.expanded = false;
 					
 					// Put in open list and continue to next neighbour
@@ -218,14 +254,16 @@ void A_star_planner<NodeType,CostType>::plan(void)
 			if ( test_g_val < thisNeighbourGraphNode->plannerVars.g )
 			{
 				thisNeighbourGraphNode->plannerVars.g = test_g_val;
-				thisNeighbourGraphNode->f = thisNeighbourGraphNode->plannerVars.g + 
-													subopEps * GraphDescriptor->_getHeuristicsToTarget( thisNeighbourGraphNode->n );
+				thisNeighbourGraphNode->f = _heapFun(thisNeighbourGraphNode->n, thisNeighbourGraphNode->plannerVars.g, 
+					                                      GraphDescriptor->_getHeuristicsToTarget( thisNeighbourGraphNode->n ), 
+					                                      thisGraphNode->plannerVars.seedLineage);
+				                                    //thisNeighbourGraphNode->plannerVars.g + 
+													//subopEps * GraphDescriptor->_getHeuristicsToTarget( thisNeighbourGraphNode->n );
 				thisNeighbourGraphNode->came_from = thisGraphNode;
 				thisNeighbourGraphNode->plannerVars.seedLineage = thisGraphNode->plannerVars.seedLineage;
 				
 				// Since thisNeighbourGraphNode->f is changed, re-arrange it in heap
-				heap->remove( thisNeighbourGraphNode );
-				heap->push( thisNeighbourGraphNode );
+				heap->update( thisNeighbourGraphNode );
 				#if _YAGSBPL_A_STAR__HANDLE_EVENTS
 					if (event_SuccUpdated_g)
 						event_SuccUpdated_g(thisGraphNode->n, thisNeighbourGraphNode->n, thisTransitionCost, 
@@ -239,6 +277,11 @@ void A_star_planner<NodeType,CostType>::plan(void)
 			}
 		}
 	}
+	#if _YAGSBPL_A_STAR__VIEW_PROGRESS
+	    if (ProgressShowInterval>0 && heap->empty())
+	        printf("Stopping search!! Heap is empty. Number of states expanded: %d. Heap size: %d. Time elapsed: %f s.\n", 
+					   expandcount, heap->size(), ((timediff>=0.0) ? timediff : difftime(time(NULL),startsecond)) );
+	#endif
 }
 
 // ==================================================================================
