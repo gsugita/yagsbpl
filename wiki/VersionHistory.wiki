@@ -9,3 +9,7 @@
   * Event handling introduced for A-star planner
   * Some structural modifications in 'SearchGraphNode' class
   * Ability to keep track of lineage when multiple seed nodes are present
+
+ * May 2013: v2.1 released
+  * Bug fixes
+  * Binary heap introduced
