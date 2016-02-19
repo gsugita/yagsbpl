@@ -1,0 +1,3 @@
+## Link to Documentation and Tutorial page ##
+
+While I am working on re-writing the documentation using Google's wiki markups, you can view the complete documentation and tutorial at http://fling.seas.upenn.edu/~subhrabh/cgi-bin/wiki/index.php?n=Projects.ProgrammingLibraries-YAGSBPL .
